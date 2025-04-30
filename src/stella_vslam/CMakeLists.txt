@@ -244,7 +244,9 @@ target_link_libraries(${PROJECT_NAME}
                       "$<$<BOOL:${USE_CUDA_EFFICIENT_DESCRIPTORS}>:${cuda_efficient_features_LIBRARY};opencv_cudafilters;opencv_cudawarping>"
                       PRIVATE
                       ${LAPACK_LIBRARIES}
-                      "$<$<BOOL:${USE_CUDA_EFFICIENT_DESCRIPTORS}>:CUDA::cudart;CUDA::cublas>")
+                      "$<$<BOOL:${USE_CUDA_EFFICIENT_DESCRIPTORS}>:CUDA::cudart;CUDA::cublas>"
+                      ort_utility::ort_utility
+                      )      
 
 # ----- Install configuration -----
 

@@ -113,6 +113,9 @@ if(NOT OpenCV_FOUND)
 endif()
 message(STATUS "Use OpenCV ${OpenCV_VERSION}")
 
+# onnx_runtime_cpp
+find_package(ort_utility)
+
 # Check aruco module
 set(USE_ARUCO ON CACHE BOOL "Enable aruco")
 set(LINK_OBJDETECT OFF CACHE BOOL "Link opencv_objdetect")

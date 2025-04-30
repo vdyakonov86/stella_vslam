@@ -12,6 +12,8 @@
 #include <memory>
 
 #include <opencv2/core/mat.hpp>
+#include <ort_utility/ort_utility.hpp>
+#include <ort-superpoint/SuperPoint.hpp>
 
 namespace stella_vslam {
 

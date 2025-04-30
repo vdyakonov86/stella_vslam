@@ -277,6 +277,10 @@ RUN pip install numpy matplotlib
  # Autocomplete
 RUN apt-get install bash-completion python3-argcomplete
 
+# onnx_runtime_cpp
+RUN apt-get -y purge cmake && sudo pip install cmake==3.25.0 && \
+    apt-get install libboost-dev -y 
+
 # Remove folder in order to ensure to run apt-get update before installing new package 
 # (without this folder 'apt-get update' will not work)
 RUN rm -rf /var/lib/apt/lists/*
