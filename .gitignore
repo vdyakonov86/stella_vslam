@@ -3,9 +3,11 @@ devel/
 lib/
 dataset/
 vocab/
+data/
 .idea/
 cmake-build-debug/
 cmake-build-release/
+stella_vslam_examples/
 */.python-version
 *.user
 *~

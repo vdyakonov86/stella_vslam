@@ -1,0 +1,1 @@
+docker build -t st_slam_dev -f Dockerfile.dev . --build-arg NUM_THREADS=`expr $(nproc) - 1`
