@@ -36,6 +36,7 @@ class bow_database;
 
 namespace feature {
 class orb_extractor;
+class superpoint_extractor;
 struct orb_params;
 } // namespace feature
 
@@ -248,6 +249,9 @@ private:
     feature::orb_extractor* extractor_right_ = nullptr;
     //! ORB extractor only when used in initializing
     feature::orb_extractor* ini_extractor_left_ = nullptr;
+
+    feature::superpoint_extractor* superpoint_extractor_left_ = nullptr;
+    feature::superpoint_extractor* superpoint_extractor_right_ = nullptr;
 
     //! number of columns of grid to accelerate reprojection matching
     unsigned int num_grid_cols_ = 64;

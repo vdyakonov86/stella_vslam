@@ -21,6 +21,7 @@
 #endif // USE_ARUCO_NANO
 #include "stella_vslam/match/stereo.h"
 #include "stella_vslam/feature/orb_extractor.h"
+#include "stella_vslam/feature/superpoint_extractor.h"
 #include "stella_vslam/io/trajectory_io.h"
 #include "stella_vslam/io/map_database_io_factory.h"
 #include "stella_vslam/publish/map_publisher.h"
@@ -95,9 +96,12 @@ system::system(const std::shared_ptr<config>& cfg, const std::string& vocab_file
     const auto min_size = preprocessing_params["min_size"].as<unsigned int>(800);
     const auto desc_type_str = preprocessing_params["descriptor_type"].as<std::string>("ORB");
     const auto desc_type = feature::descriptor_type_from_string(desc_type_str);
-    extractor_left_ = new feature::orb_extractor(orb_params_, min_size, desc_type, mask_rectangles);
+
+    auto sp = new Ort::SuperPoint("/stella_vslam/src/onnx_runtime_cpp/weights/super_point.onnx", 0);
+
+    superpoint_extractor_left_ = new feature::superpoint_extractor(sp, min_size, mask_rectangles);
     if (camera_->setup_type_ == camera::setup_type_t::Stereo) {
-        extractor_right_ = new feature::orb_extractor(orb_params_, min_size, desc_type, mask_rectangles);
+        superpoint_extractor_right_ = new feature::superpoint_extractor(sp, min_size, mask_rectangles);
     }
 
     num_grid_cols_ = preprocessing_params["num_grid_cols"].as<unsigned int>(64);
@@ -164,6 +168,11 @@ system::~system() {
     extractor_left_ = nullptr;
     delete extractor_right_;
     extractor_right_ = nullptr;
+
+    delete superpoint_extractor_left_;
+    superpoint_extractor_left_ = nullptr;
+    delete superpoint_extractor_right_;
+    superpoint_extractor_right_ = nullptr;
 
     delete marker_detector_;
     marker_detector_ = nullptr;
@@ -481,7 +490,7 @@ data::frame system::create_RGBD_frame(const cv::Mat& rgb_img, const cv::Mat& dep
 
     // Extract ORB feature
     keypts_.clear();
-    extractor_left_->extract(img_gray, mask, keypts_, frm_obs.descriptors_);
+    superpoint_extractor_left_->extract(img_gray, mask, keypts_, frm_obs.descriptors_);
     if (keypts_.empty()) {
         spdlog::warn("preprocess: cannot extract any keypoints");
     }
