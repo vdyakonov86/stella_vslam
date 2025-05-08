@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 ENV DEBIAN_FRONTEND noninteractive
 
 # install dependencies via apt
@@ -281,9 +281,14 @@ RUN apt-get install bash-completion python3-argcomplete
 RUN apt-get -y purge cmake && sudo pip install cmake==3.25.0 && \
     apt-get install libboost-dev -y 
 
+RUN apt-get install x11-apps -y
+
+COPY scripts/docker/.bashrc /home/${USERNAME}/bashrc
+RUN cat /home/${USERNAME}/bashrc >> /home/${USERNAME}/.bashrc && rm /home/${USERNAME}/bashrc
+
 # Remove folder in order to ensure to run apt-get update before installing new package 
 # (without this folder 'apt-get update' will not work)
-RUN rm -rf /var/lib/apt/lists/*
+# RUN rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
 
