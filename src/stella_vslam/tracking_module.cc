@@ -33,11 +33,12 @@ tracking_module::tracking_module(const std::shared_ptr<config>& cfg, camera::bas
       margin_local_map_projection_(tracking_yaml_["margin_local_map_projection"].as<float>(5.0)),
       margin_local_map_projection_unstable_(tracking_yaml_["margin_local_map_projection_unstable"].as<float>(20.0)),
       map_db_(map_db), bow_vocab_(bow_vocab), bow_db_(bow_db),
-      initializer_(map_db, util::yaml_optional_ref(cfg->yaml_node_, "Initializer")),
+      initializer_(map_db, util::yaml_optional_ref(cfg->yaml_node_, "Initializer"), tracking_yaml_["dist_metric"].as<std::string>("hamming")),
       pose_optimizer_(optimize::pose_optimizer_factory::create(tracking_yaml_)),
-      frame_tracker_(camera_, pose_optimizer_, 10, initializer_.get_use_fixed_seed(), tracking_yaml_["margin_last_frame_projection"].as<float>(20.0)),
+      frame_tracker_(camera_, pose_optimizer_, 10, initializer_.get_use_fixed_seed(), tracking_yaml_["margin_last_frame_projection"].as<float>(20.0), tracking_yaml_["dist_metric"].as<std::string>("hamming")),
       relocalizer_(pose_optimizer_, util::yaml_optional_ref(cfg->yaml_node_, "Relocalizer")),
-      keyfrm_inserter_(util::yaml_optional_ref(cfg->yaml_node_, "KeyframeInserter")) {
+      keyfrm_inserter_(util::yaml_optional_ref(cfg->yaml_node_, "KeyframeInserter")),
+      dist_metric_(tracking_yaml_["dist_metric"].as<std::string>("hamming")) {
     spdlog::debug("CONSTRUCT: tracking_module");
 }
 
@@ -134,8 +135,10 @@ std::shared_ptr<Mat44_t> tracking_module::feed_frame(data::frame curr_frm) {
     bool succeeded = false;
     if (tracking_state_ == tracker_state_t::Initializing) {
         succeeded = initialize();
+        spdlog::info("Initializing. succeed: {}", succeeded);
     }
     else {
+        spdlog::info("tracking_module: start tracking");
         std::lock_guard<std::mutex> lock(mtx_stop_keyframe_insertion_);
         bool relocalization_is_needed = tracking_state_ == tracker_state_t::Lost;
         SPDLOG_TRACE("tracking_module: start tracking");
@@ -205,8 +208,10 @@ bool tracking_module::track(bool relocalization_is_needed,
     if (bow_db_ && relocalize_by_pose_is_requested()) {
         // Force relocalization by pose
         succeeded = relocalize_by_pose(get_relocalize_by_pose_request());
+        spdlog::info("Force relocalization by pose. succeeded: {}", succeeded);
     }
     else if (!relocalization_is_needed) {
+        spdlog::info("relocalization_is_needed: {}", relocalization_is_needed);
         SPDLOG_TRACE("tracking_module: track_current_frame (curr_frm_={})", curr_frm_.id_);
         succeeded = track_current_frame();
     }
@@ -218,7 +223,10 @@ bool tracking_module::track(bool relocalization_is_needed,
         }
         // try to relocalize
         SPDLOG_TRACE("tracking_module: try to relocalize (curr_frm_={})", curr_frm_.id_);
+        spdlog::info("tracking_module:  try to relocalize (curr_frm_={})", curr_frm_.id_);
+
         succeeded = relocalizer_.relocalize(bow_db_, curr_frm_);
+        spdlog::info("relocalize succeeded: {}", succeeded);
         if (succeeded) {
             last_reloc_frm_id_ = curr_frm_.id_;
             last_reloc_frm_timestamp_ = curr_frm_.timestamp_;
@@ -341,6 +349,7 @@ bool tracking_module::track_current_frame() {
     if (!succeeded) {
         // Compute the BoW representations to perform the BoW match
         if (bow_vocab_ && !curr_frm_.bow_is_available()) {
+            spdlog::warn("Compute the BoW representations to perform the BoW match");
             curr_frm_.compute_bow(bow_vocab_);
         }
         if (curr_frm_.bow_is_available() && curr_frm_.ref_keyfrm_->bow_is_available()) {
@@ -351,6 +360,14 @@ bool tracking_module::track_current_frame() {
         succeeded = frame_tracker_.robust_match_based_track(curr_frm_, last_frm_, curr_frm_.ref_keyfrm_);
     }
 
+    spdlog::info("track_current_frame, frame_id: {}; succeeded: {}", curr_frm_.id_, succeeded);
+    auto undist_keypts_size = curr_frm_.frm_obs_.undist_keypts_.size();
+    auto descriptors_num = curr_frm_.frm_obs_.descriptors_.rows;
+    if (!succeeded) {
+        spdlog::warn("track_current_frame, frame_id: {}; succeeded: {}", curr_frm_.id_, succeeded);
+        spdlog::warn("undist_keypts_size: {}; descriptors_num: {}", undist_keypts_size, descriptors_num);
+    }
+    spdlog::info("succeeded: {}; undist_keypts_size: {}; descriptors_num: {}", succeeded, undist_keypts_size, descriptors_num);
     return succeeded;
 }
 
@@ -599,7 +616,7 @@ bool tracking_module::search_local_landmarks(unsigned int fixed_keyframe_id_thre
     }
 
     // acquire more 2D-3D matches by projecting the local landmarks to the current frame
-    match::projection projection_matcher(0.8);
+    match::projection projection_matcher(0.8, true, dist_metric_);
     const float margin = (curr_frm_.id_ < last_reloc_frm_id_ + 2)
                              ? margin_local_map_projection_unstable_
                              : margin_local_map_projection_;

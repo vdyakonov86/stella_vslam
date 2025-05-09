@@ -33,7 +33,7 @@ class map_database;
 class mapping_module {
 public:
     //! Constructor
-    mapping_module(const YAML::Node& yaml_node, data::map_database* map_db, data::bow_database* bow_db, data::bow_vocabulary* bow_vocab);
+    mapping_module(const YAML::Node& yaml_node, data::map_database* map_db, data::bow_database* bow_db, data::bow_vocabulary* bow_vocab, const std::string dist_metric);
 
     //! Destructor
     ~mapping_module();
@@ -273,6 +273,9 @@ private:
     // The default inlier threshold value is 0.2 degree
     // (e.g. for the camera with width of 900-pixel and 90-degree FOV, 0.2 degree is equivalent to 2 pixel in the horizontal direction)
     float residual_rad_thr_ = 0.2 * M_PI / 180.0;
+
+    //! distance metric (hamming, L2)
+    const std::string dist_metric_ = "hamming";
 };
 
 } // namespace stella_vslam

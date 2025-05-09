@@ -17,7 +17,7 @@ namespace stella_vslam {
 namespace module {
 
 initializer::initializer(data::map_database* map_db,
-                         const YAML::Node& yaml_node)
+                         const YAML::Node& yaml_node, const std::string dist_metric)
     : map_db_(map_db),
       num_ransac_iters_(yaml_node["num_ransac_iterations"].as<unsigned int>(100)),
       min_num_valid_pts_(yaml_node["min_num_valid_pts"].as<unsigned int>(50)),
@@ -28,7 +28,8 @@ initializer::initializer(data::map_database* map_db,
       scaling_factor_(yaml_node["scaling_factor"].as<float>(1.0)),
       use_fixed_seed_(yaml_node["use_fixed_seed"].as<bool>(false)),
       gain_threshold_(yaml_node["gain_threshold"].as<float>(1e-5)),
-      verbose_(yaml_node["verbose"].as<bool>(false)) {
+      verbose_(yaml_node["verbose"].as<bool>(false)),
+      dist_metric_(dist_metric) {
     spdlog::debug("CONSTRUCT: module::initializer");
 }
 
@@ -149,7 +150,7 @@ void initializer::create_initializer(data::frame& curr_frm) {
 bool initializer::try_initialize_for_monocular(data::frame& curr_frm) {
     assert(state_ == initializer_state_t::Initializing);
 
-    match::area matcher(0.9, true);
+    match::area matcher(0.9, true, dist_metric_);
     const auto num_matches = matcher.match_in_consistent_area(init_frm_, curr_frm, prev_matched_coords_, init_matches_, 100);
 
     if (num_matches < min_num_valid_pts_) {

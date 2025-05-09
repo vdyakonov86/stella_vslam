@@ -13,8 +13,8 @@ namespace match {
 
 class area final : public base {
 public:
-    area(const float lowe_ratio, const bool check_orientation)
-        : base(lowe_ratio, check_orientation) {}
+    area(const float lowe_ratio, const bool check_orientation, const std::string dist_metric = "hamming")
+        : base(lowe_ratio, check_orientation, dist_metric) {}
 
     ~area() final = default;
 

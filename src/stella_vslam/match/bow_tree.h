@@ -17,8 +17,9 @@ namespace match {
 
 class bow_tree final : public base {
 public:
-    explicit bow_tree(const float lowe_ratio = 0.6, const bool check_orientation = true)
-        : base(lowe_ratio, check_orientation) {}
+    // TODO: нужно ли менять ration и способ check_orientation 
+    explicit bow_tree(const float lowe_ratio = 0.6, const bool check_orientation = true, const std::string dist_metric = "hamming")
+        : base(lowe_ratio, check_orientation, dist_metric) {}
 
     ~bow_tree() final = default;
 

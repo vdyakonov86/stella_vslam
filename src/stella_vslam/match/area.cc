@@ -1,17 +1,18 @@
 #include "stella_vslam/data/frame.h"
 #include "stella_vslam/match/area.h"
 #include "stella_vslam/util/angle.h"
-
+#include <spdlog/spdlog.h>
 namespace stella_vslam {
 namespace match {
 
 unsigned int area::match_in_consistent_area(data::frame& frm_1, data::frame& frm_2, std::vector<cv::Point2f>& prev_matched_pts,
                                             std::vector<int>& matched_indices_2_in_frm_1, int margin) {
+    spdlog::info("match_in_consistent_area");                                           
     unsigned int num_matches = 0;
 
     matched_indices_2_in_frm_1 = std::vector<int>(frm_1.frm_obs_.undist_keypts_.size(), -1);
 
-    std::vector<unsigned int> matched_dists_in_frm_2(frm_2.frm_obs_.undist_keypts_.size(), MAX_HAMMING_DIST);
+    std::vector<float> matched_dists_in_frm_2(frm_2.frm_obs_.undist_keypts_.size(), max_dist_);
     std::vector<int> matched_indices_1_in_frm_2(frm_2.frm_obs_.undist_keypts_.size(), -1);
 
     for (unsigned int idx_1 = 0; idx_1 < frm_1.frm_obs_.undist_keypts_.size(); ++idx_1) {
@@ -32,8 +33,8 @@ unsigned int area::match_in_consistent_area(data::frame& frm_1, data::frame& frm
 
         const auto& desc_1 = frm_1.frm_obs_.descriptors_.row(idx_1);
 
-        unsigned int best_hamm_dist = MAX_HAMMING_DIST;
-        unsigned int second_best_hamm_dist = MAX_HAMMING_DIST;
+        auto best_dist = max_dist_;
+        auto second_best_dist = max_dist_;
         int best_idx_2 = -1;
 
         for (const auto idx_2 : indices) {
@@ -43,29 +44,29 @@ unsigned int area::match_in_consistent_area(data::frame& frm_1, data::frame& frm
 
             const auto& desc_2 = frm_2.frm_obs_.descriptors_.row(idx_2);
 
-            const auto hamm_dist = compute_descriptor_distance_32(desc_1, desc_2);
+            const auto dist = compute_descriptor_distance(desc_1, desc_2, dist_metric_);
 
-            // Ignore if the already-matched point is closer in Hamming space
-            if (matched_dists_in_frm_2.at(idx_2) <= hamm_dist) {
+            // Ignore if the already-matched point is closer in selected space (Hamming, L2)
+            if (matched_dists_in_frm_2.at(idx_2) <= dist) {
                 continue;
             }
 
-            if (hamm_dist < best_hamm_dist) {
-                second_best_hamm_dist = best_hamm_dist;
-                best_hamm_dist = hamm_dist;
+            if (dist < best_dist) {
+                second_best_dist = best_dist;
+                best_dist = dist;
                 best_idx_2 = idx_2;
             }
-            else if (hamm_dist < second_best_hamm_dist) {
-                second_best_hamm_dist = hamm_dist;
+            else if (dist < second_best_dist) {
+                second_best_dist = dist;
             }
         }
 
-        if (HAMMING_DIST_THR_LOW < best_hamm_dist) {
+        if (dist_thr_low_ < best_dist) {
             continue;
         }
 
         // Ratio test
-        if (second_best_hamm_dist * lowe_ratio_ < static_cast<float>(best_hamm_dist)) {
+        if (second_best_dist * lowe_ratio_ < static_cast<float>(best_dist)) {
             continue;
         }
 
@@ -83,7 +84,7 @@ unsigned int area::match_in_consistent_area(data::frame& frm_1, data::frame& frm
         // Record the mutual matching information
         matched_indices_2_in_frm_1.at(idx_1) = best_idx_2;
         matched_indices_1_in_frm_2.at(best_idx_2) = idx_1;
-        matched_dists_in_frm_2.at(best_idx_2) = best_hamm_dist;
+        matched_dists_in_frm_2.at(best_idx_2) = best_dist;
         ++num_matches;
     }
 

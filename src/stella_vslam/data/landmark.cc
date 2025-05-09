@@ -219,26 +219,26 @@ void landmark::compute_descriptor() {
         }
     }
 
-    // Get median of Hamming distance
-    // Calculate all the Hamming distances between every pair of the features
+    // Get median of distance
+    // Calculate all the distances between every pair of the features
     const auto num_descs = descriptors.size();
-    std::vector<std::vector<unsigned int>> hamm_dists(num_descs, std::vector<unsigned int>(num_descs));
+    std::vector<std::vector<unsigned int>> dists(num_descs, std::vector<unsigned int>(num_descs));
     for (unsigned int i = 0; i < num_descs; ++i) {
-        hamm_dists.at(i).at(i) = 0;
+        dists.at(i).at(i) = 0;
         for (unsigned int j = i + 1; j < num_descs; ++j) {
-            const auto dist = match::compute_descriptor_distance_32(descriptors.at(i), descriptors.at(j));
-            hamm_dists.at(i).at(j) = dist;
-            hamm_dists.at(j).at(i) = dist;
+            const auto dist = match::compute_descriptor_distance_l2(descriptors.at(i), descriptors.at(j));
+            dists.at(i).at(j) = dist;
+            dists.at(j).at(i) = dist;
         }
     }
 
     // Get the nearest value to median
-    unsigned int best_median_dist = match::MAX_HAMMING_DIST;
+    unsigned int best_median_dist = match::MAX_L2_DIST;
     unsigned int best_idx = 0;
     for (unsigned idx = 0; idx < num_descs; ++idx) {
-        std::vector<unsigned int> partial_hamm_dists(hamm_dists.at(idx).begin(), hamm_dists.at(idx).begin() + num_descs);
-        std::sort(partial_hamm_dists.begin(), partial_hamm_dists.end());
-        const auto median_dist = partial_hamm_dists.at(static_cast<unsigned int>(0.5 * (num_descs - 1)));
+        std::vector<unsigned int> partial_dists(dists.at(idx).begin(), dists.at(idx).begin() + num_descs);
+        std::sort(partial_dists.begin(), partial_dists.end());
+        const auto median_dist = partial_dists.at(static_cast<unsigned int>(0.5 * (num_descs - 1)));
 
         if (median_dist < best_median_dist) {
             best_median_dist = median_dist;

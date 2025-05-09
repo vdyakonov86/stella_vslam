@@ -76,11 +76,13 @@ system::system(const std::shared_ptr<config>& cfg, const std::string& vocab_file
 
     // tracking module
     tracker_ = new tracking_module(cfg_, camera_, map_db_, bow_vocab_, bow_db_);
+    dist_metric_ = util::yaml_optional_ref(cfg_->yaml_node_, "Tracking")["dist_metric"].as<std::string>("hamming");
+    backbone_ = util::yaml_optional_ref(cfg_->yaml_node_, "Tracking")["backbone"].as<std::string>("orb");
     // mapping module
-    mapper_ = new mapping_module(util::yaml_optional_ref(cfg->yaml_node_, "Mapping"), map_db_, bow_db_, bow_vocab_);
+    mapper_ = new mapping_module(util::yaml_optional_ref(cfg->yaml_node_, "Mapping"), map_db_, bow_db_, bow_vocab_, dist_metric_);
     // global optimization module
     if (bow_db_ && bow_vocab_) {
-        global_optimizer_ = new global_optimization_module(map_db_, bow_db_, bow_vocab_, cfg_->yaml_node_, camera_->setup_type_ != camera::setup_type_t::Monocular);
+        global_optimizer_ = new global_optimization_module(map_db_, bow_db_, bow_vocab_, cfg_->yaml_node_, camera_->setup_type_ != camera::setup_type_t::Monocular, dist_metric_);
     }
 
     // preprocessing modules
@@ -99,9 +101,16 @@ system::system(const std::shared_ptr<config>& cfg, const std::string& vocab_file
 
     auto sp = new Ort::SuperPoint("/stella_vslam/src/onnx_runtime_cpp/weights/super_point.onnx", 0);
 
-    superpoint_extractor_left_ = new feature::superpoint_extractor(sp, min_size, mask_rectangles);
-    if (camera_->setup_type_ == camera::setup_type_t::Stereo) {
-        superpoint_extractor_right_ = new feature::superpoint_extractor(sp, min_size, mask_rectangles);
+    if (backbone_ == "orb") {
+        extractor_left_ = new feature::orb_extractor(orb_params_, min_size, desc_type, mask_rectangles);
+        if (camera_->setup_type_ == camera::setup_type_t::Stereo) {
+            extractor_right_ = new feature::orb_extractor(orb_params_, min_size, desc_type, mask_rectangles);
+        }
+    } else if (backbone_ == "superpoint") {
+        superpoint_extractor_left_ = new feature::superpoint_extractor(sp, min_size, mask_rectangles);
+        if (camera_->setup_type_ == camera::setup_type_t::Stereo) {
+            superpoint_extractor_right_ = new feature::superpoint_extractor(sp, min_size, mask_rectangles);
+        }
     }
 
     num_grid_cols_ = preprocessing_params["num_grid_cols"].as<unsigned int>(64);
@@ -452,7 +461,7 @@ data::frame system::create_stereo_frame(const cv::Mat& left_img, const cv::Mat& 
     match::stereo stereo_matcher(extractor_left_->image_pyramid_, extractor_right_->image_pyramid_,
                                  keypts_, keypts_right, frm_obs.descriptors_, descriptors_right,
                                  orb_params_->scale_factors_, orb_params_->inv_scale_factors_,
-                                 camera_->focal_x_baseline_, camera_->true_baseline_);
+                                 camera_->focal_x_baseline_, camera_->true_baseline_, dist_metric_);
     stereo_matcher.compute(frm_obs.stereo_x_right_, frm_obs.depths_);
 
     // Convert to bearing vector
@@ -490,7 +499,12 @@ data::frame system::create_RGBD_frame(const cv::Mat& rgb_img, const cv::Mat& dep
 
     // Extract ORB feature
     keypts_.clear();
-    superpoint_extractor_left_->extract(img_gray, mask, keypts_, frm_obs.descriptors_);
+
+    if (backbone_ == "orb") {
+        extractor_left_->extract(img_gray, mask, keypts_, frm_obs.descriptors_);
+    } else if (backbone_ == "superpoint") {
+        superpoint_extractor_left_->extract(img_gray, mask, keypts_, frm_obs.descriptors_);
+    }
     if (keypts_.empty()) {
         spdlog::warn("preprocess: cannot extract any keypoints");
     }

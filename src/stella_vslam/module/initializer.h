@@ -33,7 +33,7 @@ public:
 
     //! Constructor
     initializer(data::map_database* map_db,
-                const YAML::Node& yaml_node);
+                const YAML::Node& yaml_node, const std::string dist_metric);
 
     //! Destructor
     ~initializer();
@@ -91,6 +91,8 @@ private:
     const float gain_threshold_;
     //! Verbosity (for g2o)
     const bool verbose_;
+
+    const std::string dist_metric_;
 
     //-----------------------------------------
     // for monocular camera model

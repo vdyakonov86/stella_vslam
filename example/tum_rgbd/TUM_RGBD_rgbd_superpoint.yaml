@@ -34,8 +34,8 @@ Camera:
 
 Tracking:
   margin_local_map_projection: 10.0
-  dist_metric: "hamming" # [hamming, L2]
-  backbone: "orb" # [orb, superpoint, disk, aliked, orb_lightglue, superpoint_lightglue, disk_lightglue, aliked_lightglue, loftr]
+  dist_metric: "L2" # [hamming, L2]
+  backbone: "superpoint" # [orb, superpoint, disk, aliked, orb_lightglue, superpoint_lightglue, disk_lightglue, aliked_lightglue, loftr]
 Preprocessing:
   min_size: 800
   depthmap_factor: 5000.0 # Note: Set it to 1.0 for the rosbag format data set.

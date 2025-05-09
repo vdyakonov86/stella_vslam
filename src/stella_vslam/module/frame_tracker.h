@@ -26,7 +26,9 @@ public:
                            const std::shared_ptr<optimize::pose_optimizer>& pose_optimizer,
                            const unsigned int num_matches_thr = 20,
                            bool use_fixed_seed = false,
-                           float margin = 20.0);
+                           float margin = 20.0,
+                           const std::string  dist_metric = "hamming" // hamming | L2
+                        );
 
     bool motion_based_track(data::frame& curr_frm, const data::frame& last_frm, const Mat44_t& velocity) const;
 
@@ -43,6 +45,8 @@ private:
     const bool use_fixed_seed_;
     //! margin for projection matcher
     const float margin_;
+    //! Distance metric (Hamming, L2 norm)
+    const std::string dist_metric_;
 
     std::shared_ptr<optimize::pose_optimizer> pose_optimizer_ = nullptr;
 };

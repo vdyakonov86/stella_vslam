@@ -33,7 +33,7 @@ struct loop_closure_request {
 class global_optimization_module {
 public:
     //! Constructor
-    global_optimization_module(data::map_database* map_db, data::bow_database* bow_db, data::bow_vocabulary* bow_vocab, const YAML::Node& yaml_node, const bool fix_scale);
+    global_optimization_module(data::map_database* map_db, data::bow_database* bow_db, data::bow_vocabulary* bow_vocab, const YAML::Node& yaml_node, const bool fix_scale, const std::string dist_metric);
 
     //! Destructor
     ~global_optimization_module();
@@ -264,6 +264,8 @@ private:
     std::unique_ptr<std::thread> thread_for_loop_BA_ = nullptr;
 
     unsigned int thr_neighbor_keyframes_ = 15;
+
+    const std::string dist_metric_ = "hamming";
 };
 
 } // namespace stella_vslam

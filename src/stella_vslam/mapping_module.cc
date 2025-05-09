@@ -17,7 +17,7 @@
 
 namespace stella_vslam {
 
-mapping_module::mapping_module(const YAML::Node& yaml_node, data::map_database* map_db, data::bow_database* bow_db, data::bow_vocabulary* bow_vocab)
+mapping_module::mapping_module(const YAML::Node& yaml_node, data::map_database* map_db, data::bow_database* bow_db, data::bow_vocabulary* bow_vocab, const std::string dist_metric)
     : local_map_cleaner_(new module::local_map_cleaner(yaml_node, map_db, bow_db)),
       map_db_(map_db), bow_db_(bow_db), bow_vocab_(bow_vocab),
       local_bundle_adjuster_(optimize::local_bundle_adjuster_factory::create(yaml_node)),
@@ -27,7 +27,8 @@ mapping_module::mapping_module(const YAML::Node& yaml_node, data::map_database* 
       num_covisibilities_for_landmark_fusion_(yaml_node["num_covisibilities_for_landmark_fusion"].as<unsigned int>(10)),
       erase_temporal_keyframes_(yaml_node["erase_temporal_keyframes"].as<bool>(false)),
       num_temporal_keyframes_(yaml_node["num_temporal_keyframes"].as<unsigned int>(15)),
-      residual_rad_thr_(yaml_node["residual_deg_thr"].as<float>(0.2) * M_PI / 180.0) {
+      residual_rad_thr_(yaml_node["residual_deg_thr"].as<float>(0.2) * M_PI / 180.0),
+      dist_metric_(dist_metric) {
     spdlog::debug("CONSTRUCT: mapping_module");
 
     spdlog::debug("load mapping parameters");
@@ -277,8 +278,8 @@ void mapping_module::create_new_landmarks(std::atomic<bool>& abort_create_new_la
     // in order to triangulate landmarks between `cur_keyfrm_` and each of the covisibilities
     const auto cur_covisibilities = cur_keyfrm_->graph_node_->get_top_n_covisibilities(num_covisibilities_for_landmark_generation_);
 
-    match::bow_tree bow_tree_matcher(0.95, false);
-    match::robust robust_matcher(0.95, false);
+    match::bow_tree bow_tree_matcher(0.95, false, dist_metric_);
+    match::robust robust_matcher(0.95, false, dist_metric_);
 
     // camera center of the current keyframe
     const Vec3_t cur_cam_center = cur_keyfrm_->get_trans_wc();
@@ -416,7 +417,7 @@ void mapping_module::update_new_keyframe() {
 
 void mapping_module::fuse_landmark_duplication(const std::vector<std::shared_ptr<data::keyframe>>& fuse_tgt_keyfrms,
                                                nondeterministic::unordered_map<std::shared_ptr<data::landmark>, std::shared_ptr<data::landmark>>& replaced_lms) {
-    match::fuse fuse_matcher(0.6);
+    match::fuse fuse_matcher(0.6, dist_metric_);
 
     {
         // reproject the landmarks observed in the current keyframe to each of the targets, and acquire

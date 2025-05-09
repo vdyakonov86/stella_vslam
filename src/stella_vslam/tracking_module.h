@@ -296,6 +296,8 @@ protected:
     bool relocalize_by_pose_is_requested_ = false;
     //! Requested pose to update
     pose_request relocalize_by_pose_request_;
+
+    const std::string dist_metric_;
 };
 
 } // namespace stella_vslam

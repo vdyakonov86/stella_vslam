@@ -5,9 +5,11 @@
 #include "stella_vslam/match/bow_tree.h"
 #include "stella_vslam/util/angle.h"
 
+#include <spdlog/spdlog.h>
+
 namespace stella_vslam {
 namespace match {
-
+  
 unsigned int bow_tree::match_for_triangulation(const std::shared_ptr<data::keyframe>& keyfrm_1,
                                                const std::shared_ptr<data::keyframe>& keyfrm_2,
                                                const Mat33_t& E_12,
@@ -62,10 +64,11 @@ unsigned int bow_tree::match_for_triangulation(const std::shared_ptr<data::keyfr
                 const Vec3_t& bearing_1 = keyfrm_1->frm_obs_.bearings_.at(idx_1);
                 const auto& desc_1 = keyfrm_1->frm_obs_.descriptors_.row(idx_1);
 
-                // Find a keypoint in keyframe 2 that has the minimum hamming distance
-                unsigned int best_hamm_dist = HAMMING_DIST_THR_LOW;
+                // Find a keypoint in keyframe 2 that has the minimum distance
+                auto best_dist = dist_thr_low_;
+                auto second_best_dist = max_dist_;
+
                 int best_idx_2 = -1;
-                unsigned int second_best_hamm_dist = MAX_HAMMING_DIST;
 
                 for (const auto idx_2 : keyfrm_2_indices) {
                     // Ignore if the keypoint is associated any 3D points
@@ -92,9 +95,9 @@ unsigned int bow_tree::match_for_triangulation(const std::shared_ptr<data::keyfr
                     const auto& desc_2 = keyfrm_2->frm_obs_.descriptors_.row(idx_2);
 
                     // Compute the distance
-                    const auto hamm_dist = compute_descriptor_distance_32(desc_1, desc_2);
+                    const float dist = compute_descriptor_distance(desc_1, desc_2, dist_metric_);
 
-                    if (HAMMING_DIST_THR_LOW < hamm_dist || best_hamm_dist < hamm_dist) {
+                    if (dist_thr_low_ < dist || best_dist < dist) {
                         continue;
                     }
 
@@ -115,13 +118,13 @@ unsigned int bow_tree::match_for_triangulation(const std::shared_ptr<data::keyfr
                                                                      keyfrm_1->orb_params_->scale_factors_.at(keypt_1.octave),
                                                                      residual_rad_thr);
                     if (is_inlier) {
-                        if (hamm_dist < best_hamm_dist) {
-                            second_best_hamm_dist = best_hamm_dist;
-                            best_hamm_dist = hamm_dist;
+                        if (dist < best_dist) {
+                            second_best_dist = best_dist;
+                            best_dist = dist;
                             best_idx_2 = idx_2;
                         }
-                        else if (hamm_dist < second_best_hamm_dist) {
-                            second_best_hamm_dist = hamm_dist;
+                        else if (dist < second_best_dist) {
+                            second_best_dist = dist;
                         }
                     }
                 }
@@ -131,7 +134,7 @@ unsigned int bow_tree::match_for_triangulation(const std::shared_ptr<data::keyfr
                 }
 
                 // Ratio test
-                if (lowe_ratio_ * second_best_hamm_dist < static_cast<float>(best_hamm_dist)) {
+                if (lowe_ratio_ * second_best_dist < static_cast<float>(best_dist)) {
                     continue;
                 }
 
@@ -198,9 +201,9 @@ unsigned int bow_tree::match_frame_and_keyframe(const std::shared_ptr<data::keyf
 
                 const auto& keyfrm_desc = keyfrm->frm_obs_.descriptors_.row(keyfrm_idx);
 
-                unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+                auto best_dist = max_dist_;
                 int best_frm_idx = -1;
-                unsigned int second_best_hamm_dist = MAX_HAMMING_DIST;
+                auto second_best_dist = max_dist_;
 
                 for (const auto frm_idx : frm_indices) {
                     if (matched_lms_in_frm.at(frm_idx)) {
@@ -212,25 +215,24 @@ unsigned int bow_tree::match_frame_and_keyframe(const std::shared_ptr<data::keyf
                     }
 
                     const auto& frm_desc = frm.frm_obs_.descriptors_.row(frm_idx);
+                    const float dist = compute_descriptor_distance(keyfrm_desc, frm_desc, dist_metric_);
 
-                    const auto hamm_dist = compute_descriptor_distance_32(keyfrm_desc, frm_desc);
-
-                    if (hamm_dist < best_hamm_dist) {
-                        second_best_hamm_dist = best_hamm_dist;
-                        best_hamm_dist = hamm_dist;
+                    if (dist < best_dist) {
+                        second_best_dist = best_dist;
+                        best_dist = dist;
                         best_frm_idx = frm_idx;
                     }
-                    else if (hamm_dist < second_best_hamm_dist) {
-                        second_best_hamm_dist = hamm_dist;
+                    else if (dist < second_best_dist) {
+                        second_best_dist = dist;
                     }
                 }
 
-                if (HAMMING_DIST_THR_LOW < best_hamm_dist) {
+                if (dist_thr_low_ < best_dist) {
                     continue;
                 }
 
                 // Ratio test
-                if (lowe_ratio_ * second_best_hamm_dist < static_cast<float>(best_hamm_dist)) {
+                if (lowe_ratio_ * second_best_dist < static_cast<float>(best_dist)) {
                     continue;
                 }
 
@@ -256,6 +258,7 @@ unsigned int bow_tree::match_frame_and_keyframe(const std::shared_ptr<data::keyf
 }
 
 unsigned int bow_tree::match_keyframes(const std::shared_ptr<data::keyframe>& keyfrm_1, const std::shared_ptr<data::keyframe>& keyfrm_2, std::vector<std::shared_ptr<data::landmark>>& matched_lms_in_keyfrm_1) const {
+    spdlog::info("MATCH_KEYFRAMES");
     unsigned int num_matches = 0;
 
     const auto keyfrm_1_lms = keyfrm_1->get_landmarks();
@@ -293,9 +296,9 @@ unsigned int bow_tree::match_keyframes(const std::shared_ptr<data::keyframe>& ke
 
                 const auto& desc_1 = keyfrm_1->frm_obs_.descriptors_.row(idx_1);
 
-                unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+                auto best_dist = max_dist_;
                 int best_idx_2 = -1;
-                unsigned int second_best_hamm_dist = MAX_HAMMING_DIST;
+                auto second_best_dist = max_dist_;
 
                 for (const auto idx_2 : keyfrm_2_indices) {
                     // Ignore if the keypoint is not associated any 3D points
@@ -317,25 +320,24 @@ unsigned int bow_tree::match_keyframes(const std::shared_ptr<data::keyframe>& ke
                     }
 
                     const auto& desc_2 = keyfrm_2->frm_obs_.descriptors_.row(idx_2);
+                    const float dist = compute_descriptor_distance(desc_1, desc_2, dist_metric_);
 
-                    const auto hamm_dist = compute_descriptor_distance_32(desc_1, desc_2);
-
-                    if (hamm_dist < best_hamm_dist) {
-                        second_best_hamm_dist = best_hamm_dist;
-                        best_hamm_dist = hamm_dist;
+                    if (dist < best_dist) {
+                        second_best_dist = best_dist;
+                        best_dist = dist;
                         best_idx_2 = idx_2;
                     }
-                    else if (hamm_dist < second_best_hamm_dist) {
-                        second_best_hamm_dist = hamm_dist;
+                    else if (dist < second_best_dist) {
+                        second_best_dist = dist;
                     }
                 }
 
-                if (HAMMING_DIST_THR_LOW < best_hamm_dist) {
+                if (dist_thr_low_ < best_dist) {
                     continue;
                 }
 
                 // Ratio test
-                if (lowe_ratio_ * second_best_hamm_dist < static_cast<float>(best_hamm_dist)) {
+                if (lowe_ratio_ * second_best_dist < static_cast<float>(best_dist)) {
                     continue;
                 }
 

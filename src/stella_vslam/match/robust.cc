@@ -54,10 +54,10 @@ unsigned int robust::match_for_triangulation(const std::shared_ptr<data::keyfram
         const Vec3_t& bearing_1 = keyfrm_1->frm_obs_.bearings_.at(idx_1);
         const auto& desc_1 = keyfrm_1->frm_obs_.descriptors_.row(idx_1);
 
-        // Find a keypoint in keyframe 2 that has the minimum hamming distance
-        unsigned int best_hamm_dist = HAMMING_DIST_THR_LOW;
+        // Find a keypoint in keyframe 2 that has the minimum distance
+        auto best_dist = dist_thr_low_;
         int best_idx_2 = -1;
-        unsigned int second_best_hamm_dist = MAX_HAMMING_DIST;
+        auto second_best_dist = max_dist_;
 
         for (unsigned int idx_2 = 0; idx_2 < num_keypts_2; ++idx_2) {
             // Ignore if the keypoint is associated any 3D points
@@ -84,9 +84,9 @@ unsigned int robust::match_for_triangulation(const std::shared_ptr<data::keyfram
             const auto& desc_2 = keyfrm_2->frm_obs_.descriptors_.row(idx_2);
 
             // Compute the distance
-            const auto hamm_dist = compute_descriptor_distance_32(desc_1, desc_2);
+            const auto dist = compute_descriptor_distance(desc_1, desc_2, dist_metric_);
 
-            if (HAMMING_DIST_THR_LOW < hamm_dist || best_hamm_dist < hamm_dist) {
+            if (dist_thr_low_ < dist || best_dist < dist) {
                 continue;
             }
 
@@ -107,13 +107,13 @@ unsigned int robust::match_for_triangulation(const std::shared_ptr<data::keyfram
                                                              keyfrm_1->orb_params_->scale_factors_.at(keypt_1.octave),
                                                              residual_rad_thr);
             if (is_inlier) {
-                if (hamm_dist < best_hamm_dist) {
-                    second_best_hamm_dist = best_hamm_dist;
-                    best_hamm_dist = hamm_dist;
+                if (dist < best_dist) {
+                    second_best_dist = best_dist;
+                    best_dist = dist;
                     best_idx_2 = idx_2;
                 }
-                else if (hamm_dist < second_best_hamm_dist) {
-                    second_best_hamm_dist = hamm_dist;
+                else if (dist < second_best_dist) {
+                    second_best_dist = dist;
                 }
             }
         }
@@ -123,7 +123,7 @@ unsigned int robust::match_for_triangulation(const std::shared_ptr<data::keyfram
         }
 
         // Ratio test
-        if (lowe_ratio_ * second_best_hamm_dist < static_cast<float>(best_hamm_dist)) {
+        if (lowe_ratio_ * second_best_dist < static_cast<float>(best_dist)) {
             continue;
         }
 
@@ -266,9 +266,9 @@ unsigned int robust::brute_force_match(const data::frame_observation& frm_obs,
         const auto& desc_2 = descs_2.row(idx_2);
 
         // Acquire the descriptors in the frame which are the first and second closest to the descriptor in the keyframe
-        unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+        auto best_dist = max_dist_;
         int best_idx_1 = -1;
-        unsigned int second_best_hamm_dist = MAX_HAMMING_DIST;
+        auto second_best_dist = max_dist_;
 
         for (unsigned int idx_1 = 0; idx_1 < num_keypts_1; ++idx_1) {
             // Avoid duplication
@@ -282,19 +282,19 @@ unsigned int robust::brute_force_match(const data::frame_observation& frm_obs,
 
             const auto& desc_1 = descs_1.row(idx_1);
 
-            const auto hamm_dist = compute_descriptor_distance_32(desc_2, desc_1);
+            const auto dist = compute_descriptor_distance(desc_2, desc_1, dist_metric_);
 
-            if (hamm_dist < best_hamm_dist) {
-                second_best_hamm_dist = best_hamm_dist;
-                best_hamm_dist = hamm_dist;
+            if (dist < best_dist) {
+                second_best_dist = best_dist;
+                best_dist = dist;
                 best_idx_1 = idx_1;
             }
-            else if (hamm_dist < second_best_hamm_dist) {
-                second_best_hamm_dist = hamm_dist;
+            else if (dist < second_best_dist) {
+                second_best_dist = dist;
             }
         }
 
-        if (HAMMING_DIST_THR_LOW < best_hamm_dist) {
+        if (dist_thr_low_ < best_dist) {
             continue;
         }
 
@@ -303,7 +303,7 @@ unsigned int robust::brute_force_match(const data::frame_observation& frm_obs,
         }
 
         // Ratio test
-        if (lowe_ratio_ * second_best_hamm_dist < static_cast<float>(best_hamm_dist)) {
+        if (lowe_ratio_ * second_best_dist < static_cast<float>(best_dist)) {
             continue;
         }
 

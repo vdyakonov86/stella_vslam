@@ -1,5 +1,5 @@
 #include "stella_vslam/match/stereo.h"
-
+#include <spdlog/spdlog.h>
 #include <opencv2/core.hpp>
 
 namespace stella_vslam {
@@ -9,13 +9,24 @@ stereo::stereo(const std::vector<cv::Mat>& left_image_pyramid, const std::vector
                const std::vector<cv::KeyPoint>& keypts_left, const std::vector<cv::KeyPoint>& keypts_right,
                const cv::Mat& descs_left, const cv::Mat& descs_right,
                const std::vector<float>& scale_factors, const std::vector<float>& inv_scale_factors,
-               const float focal_x_baseline, const float true_baseline)
+               const float focal_x_baseline, const float true_baseline, const std::string dist_metric)
     : left_image_pyramid_(left_image_pyramid), right_image_pyramid_(right_image_pyramid),
       num_keypts_(keypts_left.size()), keypts_left_(keypts_left), keypts_right_(keypts_right),
       descs_left_(descs_left), descs_right_(descs_right),
       scale_factors_(scale_factors), inv_scale_factors_(inv_scale_factors),
       focal_x_baseline_(focal_x_baseline), true_baseline_(true_baseline),
-      min_disp_(0.0f), max_disp_(focal_x_baseline_ / true_baseline_) {}
+      min_disp_(0.0f), max_disp_(focal_x_baseline_ / true_baseline_), dist_metric_(dist_metric) {
+        if (dist_metric_ == "hamming") {
+            dist_thr_low_ = static_cast<float>(match::HAMMING_DIST_THR_LOW);
+            dist_thr_high_ = static_cast<float>(match::HAMMING_DIST_THR_HIGH);
+        }
+        else if (dist_metric_ == "L2") {
+            dist_thr_low_ = match::L2_DIST_THR_LOW;
+            dist_thr_high_ = match::L2_DIST_THR_HIGH;
+        }
+
+        dist_thr_ = (dist_thr_high_ + dist_thr_low_) / 2;
+      }
 
 void stereo::compute(std::vector<float>& stereo_x_right, std::vector<float>& depths) const {
     // Save keypoint indices on the right image in each image row
@@ -52,11 +63,11 @@ void stereo::compute(std::vector<float>& stereo_x_right, std::vector<float>& dep
 
         // Search the best candidate index on the right image whose feature vector is the closest to that on the left
         unsigned int best_idx_right = 0;
-        unsigned int best_hamm_dist = hamm_dist_thr_;
+        auto best_dist = dist_thr_;
         find_closest_keypoints_in_stereo(idx_left, scale_level_left, candidate_indices_right,
-                                         min_x_right, max_x_right, best_idx_right, best_hamm_dist);
-        // Discard if the hamming distance threshold isn't satisfied
-        if (hamm_dist_thr_ <= best_hamm_dist) {
+                                         min_x_right, max_x_right, best_idx_right, best_dist);
+        // Discard if the distance threshold isn't satisfied
+        if (dist_thr_ <= best_dist) {
             continue;
         }
         const auto& keypt_right = keypts_right_.at(best_idx_right);
@@ -141,17 +152,16 @@ std::vector<std::vector<unsigned int>> stereo::get_right_keypoint_indices_in_eac
 
     return indices_right_in_row;
 }
-
 void stereo::find_closest_keypoints_in_stereo(const unsigned int idx_left, const int scale_level_left,
                                               const std::vector<unsigned int>& candidate_indices_right,
                                               const float min_x_right, const float max_x_right,
-                                              unsigned int& best_idx_right, unsigned int& best_hamm_dist) const {
+                                              unsigned int& best_idx_right, float& best_dist) const {
     best_idx_right = 0;
-    best_hamm_dist = hamm_dist_thr_;
+    best_dist = dist_thr_;
 
     const cv::Mat& desc_left = descs_left_.row(idx_left);
 
-    // Compute each hamming distance between the keypoints on the right and left images
+    // Compute each distance between the keypoints on the right and left images
     // For each of the keypoints on the left image, acquire the index of the closest keypoint on the right image
     for (const auto idx_right : candidate_indices_right) {
         const auto& keypt_right = keypts_right_.at(idx_right);
@@ -166,20 +176,20 @@ void stereo::find_closest_keypoints_in_stereo(const unsigned int idx_left, const
             continue;
         }
 
-        // Compute the hamming distance
+        // Compute the distance
         const auto& desc_right = descs_right_.row(idx_right);
-        const unsigned int hamm_dist = match::compute_descriptor_distance_32(desc_left, desc_right);
+        const float dist = match::compute_descriptor_distance(desc_left, desc_right, dist_metric_);
 
-        if (hamm_dist < best_hamm_dist) {
+        if (dist < best_dist) {
             best_idx_right = idx_right;
-            best_hamm_dist = hamm_dist;
+            best_dist = dist;
         }
     }
 }
 
 bool stereo::compute_subpixel_disparity(const cv::KeyPoint& keypt_left, const cv::KeyPoint& keypt_right,
                                         float& best_x_right, float& best_disp, float& best_correlation) const {
-    // The keypoint on the right image whose hamming distance is cloest
+    // The keypoint on the right image whose distance is cloest
     const float x_right = keypt_right.pt.x;
     // Convert cordinates to multiple scaling to compute patch correlation on the scaled image
     const float inv_scale_factor = inv_scale_factors_.at(keypt_left.octave);

@@ -2,6 +2,7 @@
 #include "stella_vslam/data/keyframe.h"
 #include "stella_vslam/data/landmark.h"
 #include "stella_vslam/data/bow_database.h"
+#include "stella_vslam/match/base.h"
 #include "stella_vslam/module/local_map_updater.h"
 #include "stella_vslam/module/relocalizer.h"
 #include "stella_vslam/optimize/pose_optimizer_g2o.h"
@@ -21,17 +22,26 @@ relocalizer::relocalizer(const std::shared_ptr<optimize::pose_optimizer>& pose_o
                          const unsigned int top_n_covisibilities_to_search,
                          const float num_common_words_thr_ratio,
                          const unsigned int max_num_ransac_iter,
-                         const unsigned int max_num_local_keyfrms)
+                         const unsigned int max_num_local_keyfrms,
+                         const std::string dist_metric)
     : min_num_bow_matches_(min_num_bow_matches), min_num_valid_obs_(min_num_valid_obs),
-      bow_matcher_(bow_match_lowe_ratio, false), proj_matcher_(proj_match_lowe_ratio, false),
-      robust_matcher_(robust_match_lowe_ratio, false),
+      bow_matcher_(bow_match_lowe_ratio, false, dist_metric), proj_matcher_(proj_match_lowe_ratio, false, dist_metric),
+      robust_matcher_(robust_match_lowe_ratio, false, dist_metric),
       pose_optimizer_(pose_optimizer), use_fixed_seed_(use_fixed_seed),
       search_neighbor_(search_neighbor),
       top_n_covisibilities_to_search_(top_n_covisibilities_to_search),
       num_common_words_thr_ratio_(num_common_words_thr_ratio),
       max_num_ransac_iter_(max_num_ransac_iter),
-      max_num_local_keyfrms_(max_num_local_keyfrms) {
+      max_num_local_keyfrms_(max_num_local_keyfrms),
+      dist_metric_(dist_metric) {
     spdlog::debug("CONSTRUCT: module::relocalizer");
+    if (dist_metric == "hamming") {
+        dist_thr_high_ = static_cast<float>(match::HAMMING_DIST_THR_HIGH);
+    }
+    else if (dist_metric == "L2") {
+        dist_thr_high_ = match::L2_DIST_THR_HIGH;
+    }
+    
 }
 
 relocalizer::relocalizer(const std::shared_ptr<optimize::pose_optimizer>& pose_optimizer, const YAML::Node& yaml_node)
@@ -241,7 +251,7 @@ bool relocalizer::refine_pose(data::frame& curr_frm,
     auto num_valid_obs = already_found_landmarks.size();
 
     // Projection match based on the pre-optimized camera pose
-    auto num_found = proj_matcher_.match_frame_and_keyframe(curr_frm, candidate_keyfrm, already_found_landmarks, 10, 100);
+    auto num_found = proj_matcher_.match_frame_and_keyframe(curr_frm, candidate_keyfrm, already_found_landmarks, 10, dist_thr_high_);
     // Discard the candidate if the number of the inliers is less than the threshold
     if (num_valid_obs + num_found < min_num_valid_obs_) {
         spdlog::debug("Number of inliers ({}) < threshold ({}). candidate keyframe id is {}", num_valid_obs + num_found, min_num_valid_obs_, candidate_keyfrm->id_);
@@ -264,7 +274,7 @@ bool relocalizer::refine_pose(data::frame& curr_frm,
         already_found_landmarks1.insert(lm);
     }
     // Apply projection match again, then set the 2D-3D matches
-    auto num_additional = proj_matcher_.match_frame_and_keyframe(curr_frm, candidate_keyfrm, already_found_landmarks1, 3, 64);
+    auto num_additional = proj_matcher_.match_frame_and_keyframe(curr_frm, candidate_keyfrm, already_found_landmarks1, 3, dist_thr_high_*0.64);
 
     // Discard if the number of the observations is less than the threshold
     if (num_valid_obs1 + num_additional < min_num_valid_obs_) {
@@ -356,7 +366,7 @@ bool relocalizer::refine_pose_by_local_map(data::frame& curr_frm,
         }
 
         // acquire more 2D-3D matches by projecting the local landmarks to the current frame
-        match::projection projection_matcher(0.8);
+        match::projection projection_matcher(0.8, true, dist_metric_);
         const float margin = margins[i];
         auto num_additional_matches = projection_matcher.match_frame_and_landmarks(curr_frm, local_landmarks, lm_to_reproj, lm_to_x_right, lm_to_scale, margin);
 

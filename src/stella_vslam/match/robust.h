@@ -19,8 +19,8 @@ namespace match {
 
 class robust final : public base {
 public:
-    explicit robust(const float lowe_ratio, const bool check_orientation)
-        : base(lowe_ratio, check_orientation) {}
+    explicit robust(const float lowe_ratio, const bool check_orientation, const std::string dist_metric = "hamming")
+        : base(lowe_ratio, check_orientation, dist_metric) {}
 
     ~robust() final = default;
 

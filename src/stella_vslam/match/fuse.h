@@ -18,8 +18,19 @@ namespace match {
 
 class fuse final {
 public:
-    explicit fuse(float lowe_ratio)
-        : lowe_ratio_(lowe_ratio) {}
+    explicit fuse(float lowe_ratio, const std::string dist_metric)
+        : lowe_ratio_(lowe_ratio), dist_metric_(dist_metric) {
+            if (dist_metric_ == "hamming") {
+                dist_thr_low_ = static_cast<float>(HAMMING_DIST_THR_LOW);
+                dist_thr_high_ = static_cast<float>(HAMMING_DIST_THR_HIGH);
+                max_dist_ = static_cast<float>(MAX_HAMMING_DIST);
+            }
+            else if (dist_metric_ == "L2") {
+                dist_thr_low_ = L2_DIST_THR_LOW;
+                dist_thr_high_ = L2_DIST_THR_HIGH;
+                max_dist_ = MAX_L2_DIST;
+            }
+        }
 
     virtual ~fuse() = default;
 
@@ -36,6 +47,10 @@ public:
 
 protected:
     const float lowe_ratio_;
+    const std::string dist_metric_;
+    float dist_thr_low_;
+    float dist_thr_high_;
+    float max_dist_;
 };
 
 } // namespace match

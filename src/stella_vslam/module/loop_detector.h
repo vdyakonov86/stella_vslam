@@ -27,7 +27,7 @@ public:
     /**
      * Constructor
      */
-    loop_detector(data::bow_database* bow_db, data::bow_vocabulary* bow_vocab, const YAML::Node& yaml_node, const bool fix_scale_in_Sim3_estimation);
+    loop_detector(data::bow_database* bow_db, data::bow_vocabulary* bow_vocab, const YAML::Node& yaml_node, const bool fix_scale_in_Sim3_estimation, const std::string dist_metric);
 
     /**
      * Enable loop detection
@@ -194,6 +194,9 @@ private:
     const bool use_fixed_seed_;
 
     const float num_common_words_thr_ratio_ = 0.8f;
+
+    const std::string dist_metric_;
+    float dist_thr_high_;
 };
 
 } // namespace module

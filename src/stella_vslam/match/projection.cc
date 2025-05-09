@@ -41,9 +41,9 @@ unsigned int projection::match_frame_and_landmarks(data::frame& frm,
 
         const cv::Mat lm_desc = local_lm->get_descriptor();
 
-        unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+        auto best_dist = max_dist_;
         int best_scale_level = -1;
-        unsigned int second_best_hamm_dist = MAX_HAMMING_DIST;
+        auto second_best_dist = max_dist_;
         int second_best_scale_level = -1;
         int best_idx = -1;
 
@@ -61,25 +61,24 @@ unsigned int projection::match_frame_and_landmarks(data::frame& frm,
             }
 
             const cv::Mat& desc = frm.frm_obs_.descriptors_.row(idx);
+            const float dist = compute_descriptor_distance(lm_desc, desc, dist_metric_);
 
-            const auto dist = compute_descriptor_distance_32(lm_desc, desc);
-
-            if (dist < best_hamm_dist) {
-                second_best_hamm_dist = best_hamm_dist;
-                best_hamm_dist = dist;
+            if (dist < best_dist) {
+                second_best_dist = best_dist;
+                best_dist = dist;
                 second_best_scale_level = best_scale_level;
                 best_scale_level = frm.frm_obs_.undist_keypts_.at(idx).octave;
                 best_idx = idx;
             }
-            else if (dist < second_best_hamm_dist) {
+            else if (dist < second_best_dist) {
                 second_best_scale_level = frm.frm_obs_.undist_keypts_.at(idx).octave;
-                second_best_hamm_dist = dist;
+                second_best_dist = dist;
             }
         }
 
-        if (best_hamm_dist <= HAMMING_DIST_THR_HIGH) {
+        if (best_dist <= dist_thr_high_) {
             // Lowe's ratio test
-            if (best_scale_level == second_best_scale_level && best_hamm_dist > lowe_ratio_ * second_best_hamm_dist) {
+            if (best_scale_level == second_best_scale_level && best_dist > lowe_ratio_ * second_best_dist) {
                 continue;
             }
 
@@ -164,7 +163,7 @@ unsigned int projection::match_current_and_last_frames(data::frame& curr_frm, co
 
         const auto lm_desc = lm->get_descriptor();
 
-        unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+        auto best_dist = max_dist_;
         int best_idx = -1;
 
         for (const auto curr_idx : indices) {
@@ -186,15 +185,15 @@ unsigned int projection::match_current_and_last_frames(data::frame& curr_frm, co
 
             const auto& desc = curr_frm.frm_obs_.descriptors_.row(curr_idx);
 
-            const auto hamm_dist = compute_descriptor_distance_32(lm_desc, desc);
+            const float dist = compute_descriptor_distance(lm_desc, desc, dist_metric_);
 
-            if (hamm_dist < best_hamm_dist) {
-                best_hamm_dist = hamm_dist;
+            if (dist < best_dist) {
+                best_dist = dist;
                 best_idx = curr_idx;
             }
         }
 
-        if (HAMMING_DIST_THR_HIGH < best_hamm_dist) {
+        if (dist_thr_high_ < best_dist) {
             continue;
         }
 
@@ -207,9 +206,9 @@ unsigned int projection::match_current_and_last_frames(data::frame& curr_frm, co
 }
 
 unsigned int projection::match_frame_and_keyframe(data::frame& curr_frm, const std::shared_ptr<data::keyframe>& keyfrm, const std::set<std::shared_ptr<data::landmark>>& already_matched_lms,
-                                                  const float margin, const unsigned int hamm_dist_thr) const {
+                                                  const float margin, const float dist_thr) const {
     auto lms = curr_frm.get_landmarks();
-    auto num_matches = match_frame_and_keyframe(curr_frm.get_pose_cw(), curr_frm.camera_, curr_frm.frm_obs_, curr_frm.orb_params_, lms, keyfrm, already_matched_lms, margin, hamm_dist_thr);
+    auto num_matches = match_frame_and_keyframe(curr_frm.get_pose_cw(), curr_frm.camera_, curr_frm.frm_obs_, curr_frm.orb_params_, lms, keyfrm, already_matched_lms, margin, dist_thr);
     curr_frm.set_landmarks(lms);
     return num_matches;
 }
@@ -221,7 +220,7 @@ unsigned int projection::match_frame_and_keyframe(const Mat44_t& cam_pose_cw,
                                                   std::vector<std::shared_ptr<data::landmark>>& frm_landmarks,
                                                   const std::shared_ptr<data::keyframe>& keyfrm,
                                                   const std::set<std::shared_ptr<data::landmark>>& already_matched_lms,
-                                                  const float margin, const unsigned int hamm_dist_thr) const {
+                                                  const float margin, const float dist_thr) const {
     unsigned int num_matches = 0;
 
     const Mat33_t rot_cw = cam_pose_cw.block<3, 3>(0, 0);
@@ -284,7 +283,7 @@ unsigned int projection::match_frame_and_keyframe(const Mat44_t& cam_pose_cw,
 
         const auto lm_desc = lm->get_descriptor();
 
-        unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+        auto best_dist = max_dist_;
         int best_idx = -1;
 
         for (unsigned long curr_idx : indices) {
@@ -298,15 +297,15 @@ unsigned int projection::match_frame_and_keyframe(const Mat44_t& cam_pose_cw,
 
             const auto& desc = frm_obs.descriptors_.row(curr_idx);
 
-            const auto hamm_dist = compute_descriptor_distance_32(lm_desc, desc);
+            const float dist = compute_descriptor_distance(lm_desc, desc, dist_metric_);
 
-            if (hamm_dist < best_hamm_dist) {
-                best_hamm_dist = hamm_dist;
+            if (dist < best_dist) {
+                best_dist = dist;
                 best_idx = curr_idx;
             }
         }
 
-        if (hamm_dist_thr < best_hamm_dist) {
+        if (dist_thr < best_dist) {
             continue;
         }
 
@@ -386,7 +385,7 @@ unsigned int projection::match_by_Sim3_transform(const std::shared_ptr<data::key
         // Find keypoints with the closest descriptor
         const auto lm_desc = lm->get_descriptor();
 
-        unsigned int best_dist = MAX_HAMMING_DIST;
+        auto best_dist = max_dist_;
         int best_idx = -1;
 
         for (const auto idx : indices) {
@@ -396,15 +395,15 @@ unsigned int projection::match_by_Sim3_transform(const std::shared_ptr<data::key
 
             const auto& desc = keyfrm->frm_obs_.descriptors_.row(idx);
 
-            const auto hamm_dist = compute_descriptor_distance_32(lm_desc, desc);
+            const float dist = compute_descriptor_distance(lm_desc, desc, dist_metric_);
 
-            if (hamm_dist < best_dist) {
-                best_dist = hamm_dist;
+            if (dist < best_dist) {
+                best_dist = dist;
                 best_idx = idx;
             }
         }
 
-        if (HAMMING_DIST_THR_LOW < best_dist) {
+        if (dist_thr_low_ < best_dist) {
             continue;
         }
 
@@ -511,21 +510,21 @@ unsigned int projection::match_keyframes_mutually(const std::shared_ptr<data::ke
             // Find a keypoint with the closest descriptor
             const auto lm_desc = lm->get_descriptor();
 
-            unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+            auto best_dist = max_dist_;
             int best_idx_2 = -1;
 
             for (const auto idx_2 : indices) {
                 const auto& desc = keyfrm_2->frm_obs_.descriptors_.row(idx_2);
 
-                const auto hamm_dist = compute_descriptor_distance_32(lm_desc, desc);
+                const float dist = compute_descriptor_distance(lm_desc, desc, dist_metric_);
 
-                if (hamm_dist < best_hamm_dist) {
-                    best_hamm_dist = hamm_dist;
+                if (dist < best_dist) {
+                    best_dist = dist;
                     best_idx_2 = idx_2;
                 }
             }
 
-            if (best_hamm_dist <= HAMMING_DIST_THR_HIGH) {
+            if (best_dist <= dist_thr_high_) {
                 matched_indices_2_in_keyfrm_1.at(idx_1) = best_idx_2;
             }
         }
@@ -590,21 +589,21 @@ unsigned int projection::match_keyframes_mutually(const std::shared_ptr<data::ke
             // Find a keypoint with the closest descriptor
             const auto lm_desc = lm->get_descriptor();
 
-            unsigned int best_hamm_dist = MAX_HAMMING_DIST;
+            auto best_dist = max_dist_;
             int best_idx_1 = -1;
 
             for (const auto idx_1 : indices) {
                 const auto& desc = keyfrm_1->frm_obs_.descriptors_.row(idx_1);
 
-                const auto hamm_dist = compute_descriptor_distance_32(lm_desc, desc);
+                const float dist = compute_descriptor_distance(lm_desc, desc, dist_metric_);
 
-                if (hamm_dist < best_hamm_dist) {
-                    best_hamm_dist = hamm_dist;
+                if (dist < best_dist) {
+                    best_dist = dist;
                     best_idx_1 = idx_1;
                 }
             }
 
-            if (best_hamm_dist <= HAMMING_DIST_THR_HIGH) {
+            if (best_dist <= dist_thr_high_) {
                 matched_indices_1_in_keyfrm_2.at(idx_2) = best_idx_1;
             }
         }

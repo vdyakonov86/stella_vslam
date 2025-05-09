@@ -14,11 +14,11 @@ namespace stella_vslam {
 namespace module {
 
 frame_tracker::frame_tracker(camera::base* camera, const std::shared_ptr<optimize::pose_optimizer>& pose_optimizer,
-                             const unsigned int num_matches_thr, bool use_fixed_seed, float margin)
-    : camera_(camera), num_matches_thr_(num_matches_thr), use_fixed_seed_(use_fixed_seed), margin_(margin), pose_optimizer_(pose_optimizer) {}
+                             const unsigned int num_matches_thr, bool use_fixed_seed, float margin, const std::string dist_metric)
+    : camera_(camera), num_matches_thr_(num_matches_thr), use_fixed_seed_(use_fixed_seed), margin_(margin), pose_optimizer_(pose_optimizer), dist_metric_(dist_metric) {}
 
 bool frame_tracker::motion_based_track(data::frame& curr_frm, const data::frame& last_frm, const Mat44_t& velocity) const {
-    match::projection projection_matcher(0.9, true);
+    match::projection projection_matcher(0.9, true, dist_metric_);
 
     // Set the initial pose by using the motion model
     curr_frm.set_pose_cw(velocity * last_frm.get_pose_cw());
@@ -37,6 +37,7 @@ bool frame_tracker::motion_based_track(data::frame& curr_frm, const data::frame&
 
     if (num_matches < num_matches_thr_) {
         spdlog::debug("motion based tracking failed: {} matches < {}", num_matches, num_matches_thr_);
+        spdlog::warn("motion based tracking failed: {} inlier matches < {}", num_matches, num_matches_thr_);
         return false;
     }
 
@@ -51,15 +52,17 @@ bool frame_tracker::motion_based_track(data::frame& curr_frm, const data::frame&
 
     if (num_valid_matches < num_matches_thr_) {
         spdlog::debug("motion based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
+        spdlog::warn("motion based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
         return false;
     }
     else {
+        spdlog::info("motion_based_track. num_matches: {}; num_valid_matches: {}", num_matches, num_valid_matches);
         return true;
     }
 }
 
 bool frame_tracker::bow_match_based_track(data::frame& curr_frm, const data::frame& last_frm, const std::shared_ptr<data::keyframe>& ref_keyfrm) const {
-    match::bow_tree bow_matcher(0.7, true);
+    match::bow_tree bow_matcher(0.7, true, dist_metric_);
 
     // Search 2D-2D matches between the ref keyframes and the current frame
     // to acquire 2D-3D matches between the frame keypoints and 3D points observed in the ref keyframe
@@ -68,6 +71,7 @@ bool frame_tracker::bow_match_based_track(data::frame& curr_frm, const data::fra
 
     if (num_matches < num_matches_thr_) {
         spdlog::debug("bow match based tracking failed: {} matches < {}", num_matches, num_matches_thr_);
+        spdlog::warn("bow match based tracking failed: {} matches < {}", num_matches, num_matches_thr_);
         return false;
     }
 
@@ -87,15 +91,17 @@ bool frame_tracker::bow_match_based_track(data::frame& curr_frm, const data::fra
 
     if (num_valid_matches < num_matches_thr_) {
         spdlog::debug("bow match based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
+        spdlog::warn("bow match based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
         return false;
     }
     else {
+        spdlog::info("bow_match_based_track num_matches: {}; num_valid_matches: {}", num_matches, num_valid_matches);
         return true;
     }
 }
 
 bool frame_tracker::robust_match_based_track(data::frame& curr_frm, const data::frame& last_frm, const std::shared_ptr<data::keyframe>& ref_keyfrm) const {
-    match::robust robust_matcher(0.8, true);
+    match::robust robust_matcher(0.8, true, dist_metric_);
 
     // Search 2D-2D matches between the ref keyframes and the current frame
     // to acquire 2D-3D matches between the frame keypoints and 3D points observed in the ref keyframe
@@ -104,6 +110,7 @@ bool frame_tracker::robust_match_based_track(data::frame& curr_frm, const data::
 
     if (num_matches < num_matches_thr_) {
         spdlog::debug("robust match based tracking failed: {} matches < {}", num_matches, num_matches_thr_);
+        spdlog::warn("robust match based tracking failed: {} matches < {}", num_matches, num_matches_thr_);
         return false;
     }
 
@@ -123,9 +130,11 @@ bool frame_tracker::robust_match_based_track(data::frame& curr_frm, const data::
 
     if (num_valid_matches < num_matches_thr_) {
         spdlog::debug("robust match based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
+        spdlog::warn("robust match based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
         return false;
     }
     else {
+        spdlog::info("robust_match_based_track num_matches: {}; num_valid_matches: {}", num_matches, num_valid_matches);
         return true;
     }
 }

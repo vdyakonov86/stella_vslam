@@ -14,8 +14,9 @@ namespace stella_vslam {
 
 global_optimization_module::global_optimization_module(data::map_database* map_db, data::bow_database* bow_db,
                                                        data::bow_vocabulary* bow_vocab, const YAML::Node& yaml_node,
-                                                       const bool fix_scale)
-    : loop_detector_(new module::loop_detector(bow_db, bow_vocab, util::yaml_optional_ref(yaml_node, "LoopDetector"), fix_scale)),
+                                                       const bool fix_scale,
+                                                       const std::string dist_metric)
+    : loop_detector_(new module::loop_detector(bow_db, bow_vocab, util::yaml_optional_ref(yaml_node, "LoopDetector"), fix_scale, dist_metric)),
       loop_bundle_adjuster_(new module::loop_bundle_adjuster(
           map_db,
           util::yaml_optional_ref(yaml_node, "GlobalOptimizer")["num_iter"].as<unsigned int>(10),
@@ -23,7 +24,8 @@ global_optimization_module::global_optimization_module(data::map_database* map_d
           util::yaml_optional_ref(yaml_node, "GlobalOptimizer")["verbose"].as<bool>(false))),
       map_db_(map_db),
       graph_optimizer_(new optimize::graph_optimizer(util::yaml_optional_ref(yaml_node, "GraphOptimizer"), fix_scale)),
-      thr_neighbor_keyframes_(util::yaml_optional_ref(yaml_node, "GlobalOptimizer")["thr_neighbor_keyframes"].as<unsigned int>(15)) {
+      thr_neighbor_keyframes_(util::yaml_optional_ref(yaml_node, "GlobalOptimizer")["thr_neighbor_keyframes"].as<unsigned int>(15)),
+      dist_metric_(dist_metric) {
     spdlog::debug("CONSTRUCT: global_optimization_module");
 }
 
@@ -445,7 +447,7 @@ void global_optimization_module::replace_duplicated_landmarks(const std::vector<
 
     // resolve duplications of landmarks between the current keyframe and the candidates of the loop candidate
     auto curr_match_lms_observed_in_cand_covis = loop_detector_->current_matched_landmarks_observed_in_candidate_covisibilities();
-    match::fuse fuse_matcher(0.8);
+    match::fuse fuse_matcher(0.8, dist_metric_);
     for (const auto& t : Sim3s_nw_after_correction) {
         auto neighbor = t.first;
         const Mat44_t Sim3_nw_after_correction = util::converter::to_eigen_mat(t.second);

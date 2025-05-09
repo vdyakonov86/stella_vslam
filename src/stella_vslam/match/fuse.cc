@@ -2,7 +2,7 @@
 #include "stella_vslam/camera/base.h"
 #include "stella_vslam/data/keyframe.h"
 #include "stella_vslam/data/landmark.h"
-
+#include <spdlog/spdlog.h>
 #include <vector>
 
 namespace stella_vslam {
@@ -17,6 +17,7 @@ unsigned int fuse::detect_duplication(const std::shared_ptr<data::keyframe>& key
                                       std::unordered_map<std::shared_ptr<data::landmark>, std::shared_ptr<data::landmark>>& duplicated_lms_in_keyfrm,
                                       std::unordered_map<unsigned int, std::shared_ptr<data::landmark>>& new_connections,
                                       bool do_reprojection_matching) const {
+    spdlog::info("detect_duplication");
     const Vec3_t trans_wc = -rot_cw.transpose() * trans_cw;
     unsigned int num_fused = 0;
     std::unordered_set<unsigned int> already_matched_idx_in_keyfrm;
@@ -80,7 +81,7 @@ unsigned int fuse::detect_duplication(const std::shared_ptr<data::keyframe>& key
         // Find a keypoint with the closest descriptor
         const auto lm_desc = lm->get_descriptor();
 
-        unsigned int best_dist = MAX_HAMMING_DIST;
+        auto best_dist = max_dist_;
         int best_idx = -1;
 
         for (const auto idx : indices) {
@@ -120,15 +121,15 @@ unsigned int fuse::detect_duplication(const std::shared_ptr<data::keyframe>& key
 
             const auto& desc = keyfrm->frm_obs_.descriptors_.row(idx);
 
-            const auto hamm_dist = compute_descriptor_distance_32(lm_desc, desc);
+            const auto dist = compute_descriptor_distance(lm_desc, desc, dist_metric_);
 
-            if (hamm_dist < best_dist) {
-                best_dist = hamm_dist;
+            if (dist < best_dist) {
+                best_dist = dist;
                 best_idx = idx;
             }
         }
 
-        if (HAMMING_DIST_THR_LOW < best_dist) {
+        if (dist_thr_low_ < best_dist) {
             continue;
         }
 

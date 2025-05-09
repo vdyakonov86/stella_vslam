@@ -205,6 +205,13 @@ private:
 
     //! config
     const std::shared_ptr<config> cfg_;
+
+    //!backbone type
+    std::string backbone_;
+
+    //! distance metric
+    std::string dist_metric_;
+
     //! camera model
     camera::base* camera_ = nullptr;
 

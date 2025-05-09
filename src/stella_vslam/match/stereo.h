@@ -19,7 +19,7 @@ public:
            const std::vector<cv::KeyPoint>& keypts_left, const std::vector<cv::KeyPoint>& keypts_right,
            const cv::Mat& descs_left, const cv::Mat& descs_right,
            const std::vector<float>& scale_factors, const std::vector<float>& inv_scale_factors,
-           const float focal_x_baseline, const float true_baseline);
+           const float focal_x_baseline, const float true_baseline, const std::string dist_metric);
 
     virtual ~stereo() = default;
 
@@ -44,12 +44,12 @@ private:
      * @param min_x_right
      * @param max_x_right
      * @param best_idx_right
-     * @param best_hamm_dist
+     * @param best_dist
      */
     void find_closest_keypoints_in_stereo(const unsigned int idx_left, const int scale_level_left,
                                           const std::vector<unsigned int>& candidate_indices_right,
                                           const float min_x_right, const float max_x_right,
-                                          unsigned int& best_idx_right, unsigned int& best_hamm_dist) const;
+                                          unsigned int& best_idx_right, float& best_dist) const;
 
     /**
      * Compute subpixel disparity using patch correlation and parabola fitting
@@ -94,9 +94,15 @@ private:
     const float min_disp_;
     //! maximum disparity
     const float max_disp_;
+    
+    //! maximum distance
+    float dist_thr_;
 
-    //! maximum hamming distance
-    static constexpr unsigned int hamm_dist_thr_ = (match::HAMMING_DIST_THR_HIGH + match::HAMMING_DIST_THR_LOW) / 2;
+    float dist_thr_low_;
+    float dist_thr_high_;
+
+    //! distance metric (hamming, L2)
+    const std::string dist_metric_;
 };
 
 } // namespace match
