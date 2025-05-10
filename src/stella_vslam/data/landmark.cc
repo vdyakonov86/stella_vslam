@@ -13,7 +13,14 @@ namespace data {
 
 landmark::landmark(unsigned int id, const Vec3_t& pos_w, const std::shared_ptr<keyframe>& ref_keyfrm)
     : id_(id), first_keyfrm_id_(ref_keyfrm->id_), pos_w_(pos_w),
-      ref_keyfrm_(ref_keyfrm) {}
+      ref_keyfrm_(ref_keyfrm), dist_metric_(ref_keyfrm->dist_metric_) {
+        if (dist_metric_ == "hamming") {
+            max_dist_ = static_cast<float>(match::MAX_HAMMING_DIST);
+        }
+        else if (dist_metric_ == "L2") {
+            max_dist_ = match::MAX_L2_DIST;
+        }
+      }
 
 landmark::landmark(const unsigned int id, const unsigned int first_keyfrm_id,
                    const Vec3_t& pos_w, const std::shared_ptr<keyframe>& ref_keyfrm,
@@ -222,21 +229,21 @@ void landmark::compute_descriptor() {
     // Get median of distance
     // Calculate all the distances between every pair of the features
     const auto num_descs = descriptors.size();
-    std::vector<std::vector<unsigned int>> dists(num_descs, std::vector<unsigned int>(num_descs));
+    std::vector<std::vector<float>> dists(num_descs, std::vector<float>(num_descs));
     for (unsigned int i = 0; i < num_descs; ++i) {
         dists.at(i).at(i) = 0;
         for (unsigned int j = i + 1; j < num_descs; ++j) {
-            const auto dist = match::compute_descriptor_distance_l2(descriptors.at(i), descriptors.at(j));
+            const auto dist = match::compute_descriptor_distance(descriptors.at(i), descriptors.at(j), dist_metric_);
             dists.at(i).at(j) = dist;
             dists.at(j).at(i) = dist;
         }
     }
 
     // Get the nearest value to median
-    unsigned int best_median_dist = match::MAX_L2_DIST;
+    float best_median_dist = max_dist_;
     unsigned int best_idx = 0;
     for (unsigned idx = 0; idx < num_descs; ++idx) {
-        std::vector<unsigned int> partial_dists(dists.at(idx).begin(), dists.at(idx).begin() + num_descs);
+        std::vector<float> partial_dists(dists.at(idx).begin(), dists.at(idx).begin() + num_descs);
         std::sort(partial_dists.begin(), partial_dists.end());
         const auto median_dist = partial_dists.at(static_cast<unsigned int>(0.5 * (num_descs - 1)));
 

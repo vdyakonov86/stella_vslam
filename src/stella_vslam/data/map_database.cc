@@ -389,6 +389,8 @@ void map_database::register_keyframe(camera_database* cam_db, orb_params_databas
     const auto descriptors = convert_json_to_descriptors(json_descriptors);
     assert(descriptors.rows == static_cast<int>(num_keypts));
 
+    std::string dist_metric = json_keyfrm.at("dist_metric_");
+
     // Construct a new object
     data::bow_vector bow_vec;
     data::bow_feature_vector bow_feat_vec;
@@ -400,7 +402,7 @@ void map_database::register_keyframe(camera_database* cam_db, orb_params_databas
     }
     auto keyfrm = data::keyframe::make_keyframe(
         id, timestamp, pose_cw, camera, orb_params,
-        frm_obs, bow_vec, bow_feat_vec);
+        frm_obs, bow_vec, bow_feat_vec, {}, dist_metric);
 
     // Append to map database
     assert(!keyframes_.count(id));

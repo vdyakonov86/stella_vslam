@@ -182,6 +182,9 @@ private:
 
     mutable std::mutex mtx_position_;
     mutable std::mutex mtx_observations_;
+
+    std::string dist_metric_;
+    float max_dist_;
 };
 
 } // namespace data

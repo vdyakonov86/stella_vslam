@@ -52,7 +52,7 @@ public:
              const double timestamp, const Mat44_t& pose_cw, camera::base* camera,
              const feature::orb_params* orb_params, const frame_observation& frm_obs,
              const bow_vector& bow_vec, const bow_feature_vector& bow_feat_vec,
-             std::unordered_map<unsigned int, marker2d> markers_2d = {});
+             std::unordered_map<unsigned int, marker2d> markers_2d = {}, std::string dist_metric = "hamming");
     virtual ~keyframe();
 
     // Factory method for create keyframe
@@ -62,7 +62,7 @@ public:
         const double timestamp, const Mat44_t& pose_cw, camera::base* camera,
         const feature::orb_params* orb_params, const frame_observation& frm_obs,
         const bow_vector& bow_vec, const bow_feature_vector& bow_feat_vec,
-        std::unordered_map<unsigned int, marker2d> markers_2d = {});
+        std::unordered_map<unsigned int, marker2d> markers_2d = {}, std::string dist_metric = "hamming");
     static std::shared_ptr<keyframe> from_stmt(sqlite3_stmt* stmt,
                                                camera_database* cam_db,
                                                orb_params_database* orb_params_db,
@@ -287,6 +287,8 @@ public:
 
     //! graph node
     std::unique_ptr<graph_node> graph_node_ = nullptr;
+
+    std::string dist_metric_;
 
 private:
     //-----------------------------------------

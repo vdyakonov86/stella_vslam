@@ -50,9 +50,10 @@ public:
      * @param orb_params
      * @param frm_obs
      * @param markers_2d
+     * @param dist_metric
      */
     frame(const unsigned int frame_id, const double timestamp, camera::base* camera, feature::orb_params* orb_params,
-          const frame_observation frm_obs, const std::unordered_map<unsigned int, marker2d>& markers_2d);
+          const frame_observation frm_obs, const std::unordered_map<unsigned int, marker2d>& markers_2d, std::string dist_metric);
 
     /**
      * Set camera pose and refresh rotation and translation
@@ -185,6 +186,7 @@ public:
     //! reference keyframe for tracking
     std::shared_ptr<keyframe> ref_keyfrm_ = nullptr;
 
+    std::string dist_metric_;
 private:
     //! landmarks, whose nullptr indicates no-association
     std::vector<std::shared_ptr<landmark>> landmarks_;

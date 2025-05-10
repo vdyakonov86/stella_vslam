@@ -107,7 +107,8 @@ keyframe::keyframe(unsigned int id, const frame& frm)
       frm_obs_(frm.frm_obs_),
       bow_vec_(frm.bow_vec_), bow_feat_vec_(frm.bow_feat_vec_),
       markers_2d_(frm.markers_2d_),
-      landmarks_(frm.get_landmarks()) {
+      landmarks_(frm.get_landmarks()),
+      dist_metric_(frm.dist_metric_) {
     // set pose parameters (pose_wc_, trans_wc_) using frm.pose_cw_
     set_pose_cw(frm.get_pose_cw());
 }
@@ -116,13 +117,14 @@ keyframe::keyframe(const unsigned int id, const double timestamp,
                    const Mat44_t& pose_cw, camera::base* camera,
                    const feature::orb_params* orb_params, const frame_observation& frm_obs,
                    const bow_vector& bow_vec, const bow_feature_vector& bow_feat_vec,
-                   std::unordered_map<unsigned int, marker2d> markers_2d)
+                   std::unordered_map<unsigned int, marker2d> markers_2d, std::string dist_metric)
     : id_(id),
       timestamp_(timestamp), camera_(camera),
       orb_params_(orb_params), frm_obs_(frm_obs),
       bow_vec_(bow_vec), bow_feat_vec_(bow_feat_vec),
       markers_2d_(markers_2d),
-      landmarks_(std::vector<std::shared_ptr<landmark>>(frm_obs_.undist_keypts_.size(), nullptr)) {
+      landmarks_(std::vector<std::shared_ptr<landmark>>(frm_obs_.undist_keypts_.size(), nullptr)),
+      dist_metric_(dist_metric) {
     // set pose parameters (pose_wc_, trans_wc_) using pose_cw_
     set_pose_cw(pose_cw);
 
@@ -150,12 +152,12 @@ std::shared_ptr<keyframe> keyframe::make_keyframe(
     const Mat44_t& pose_cw, camera::base* camera,
     const feature::orb_params* orb_params, const frame_observation& frm_obs,
     const bow_vector& bow_vec, const bow_feature_vector& bow_feat_vec,
-    std::unordered_map<unsigned int, marker2d> markers_2d) {
+    std::unordered_map<unsigned int, marker2d> markers_2d, std::string dist_metric) {
     auto ptr = std::allocate_shared<keyframe>(
         Eigen::aligned_allocator<keyframe>(),
         id, timestamp,
         pose_cw, camera, orb_params,
-        frm_obs, bow_vec, bow_feat_vec, markers_2d);
+        frm_obs, bow_vec, bow_feat_vec, markers_2d, dist_metric);
     // covisibility graph node (connections is not assigned yet)
     ptr->graph_node_ = stella_vslam::make_unique<graph_node>(ptr);
     return ptr;
