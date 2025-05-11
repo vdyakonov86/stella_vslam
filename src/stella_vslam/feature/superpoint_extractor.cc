@@ -13,15 +13,6 @@
 namespace stella_vslam {
 namespace feature {
 
-void normalizeDescriptors(cv::Mat* descriptors) {
-    cv::Mat rsquaredSumMat;
-    cv::reduce(descriptors->mul(*descriptors), rsquaredSumMat, 1, cv::REDUCE_SUM);
-    cv::sqrt(rsquaredSumMat, rsquaredSumMat);
-    for (int i = 0; i < descriptors->rows; ++i) {
-        float rsquaredSum = std::max<float>(rsquaredSumMat.ptr<float>()[i], 1e-12);
-        descriptors->row(i) /= rsquaredSum;
-    }
-}
 superpoint_extractor::superpoint_extractor(Ort::SuperPoint* superPoint, 
                                            const unsigned int min_area,
                                            const std::vector<std::vector<float>>& mask_rects): 
@@ -42,7 +33,6 @@ void superpoint_extractor::extract(const cv::_InputArray& in_image, const cv::_I
     unsigned int desc_dim = 256;
 
     KeyPointAndDesc result = (*superPoint_).inference(*superPoint_, image);
-    normalizeDescriptors(&result.second);
 
     keypts = result.first;
     unsigned int keyptsN = keypts.size();
@@ -52,7 +42,8 @@ void superpoint_extractor::extract(const cv::_InputArray& in_image, const cv::_I
     else {
         out_descriptors.create(keypts.size(), desc_dim, CV_32FC1);
         cv::Mat descriptors = out_descriptors.getMat();
-        descriptors = result.second;
+        // Perform normalization and full out descriptors
+        cv::normalize(result.second, descriptors, 1.0, 0.0, cv::NORM_L2);
     }
     
     // mask initialization
