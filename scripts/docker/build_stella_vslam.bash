@@ -15,3 +15,5 @@ cd /stella_vslam && \
       -DENABLE_STACKTRACE=ON .. && \
   sudo make -j4 && \
   sudo make install
+
+  cd /stella_vslam/stella_vslam_examples/build
