@@ -5,6 +5,7 @@
 #include "stella_vslam/match/bow_tree.h"
 #include "stella_vslam/match/projection.h"
 #include "stella_vslam/match/robust.h"
+#include "stella_vslam/match/superglue.h"
 #include "stella_vslam/module/frame_tracker.h"
 #include "stella_vslam/optimize/pose_optimizer_g2o.h"
 
@@ -16,6 +17,18 @@ namespace module {
 frame_tracker::frame_tracker(camera::base* camera, const std::shared_ptr<optimize::pose_optimizer>& pose_optimizer,
                              const unsigned int num_matches_thr, bool use_fixed_seed, float margin, const std::string dist_metric)
     : camera_(camera), num_matches_thr_(num_matches_thr), use_fixed_seed_(use_fixed_seed), margin_(margin), pose_optimizer_(pose_optimizer), dist_metric_(dist_metric) {}
+
+bool frame_tracker::superglue_based_track(data::frame& curr_frm, const data::frame& last_frm) const{
+    match::superglue superglue_matcher;
+    auto num_matches = superglue_matcher.match_current_and_last_frames(curr_frm, last_frm);
+
+    if (num_matches < num_matches_thr_) {
+        spdlog::debug("superglue_based_track failed: {} matches < {}", num_matches, num_matches_thr_);
+        spdlog::warn("superglue_based_track failed: {} matches < {}", num_matches, num_matches_thr_);
+        return false;
+    }
+    return true;
+}
 
 bool frame_tracker::motion_based_track(data::frame& curr_frm, const data::frame& last_frm, const Mat44_t& velocity) const {
     match::projection projection_matcher(0.9, true, dist_metric_);
@@ -52,7 +65,7 @@ bool frame_tracker::motion_based_track(data::frame& curr_frm, const data::frame&
 
     if (num_valid_matches < num_matches_thr_) {
         spdlog::debug("motion based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
-        spdlog::warn("motion based tracking failed: {} inlier matches < {}", num_valid_matches, num_matches_thr_);
+        spdlog::warn("motion based tracking failed. num_matches: {}; num_valid_matches: {}", num_matches, num_valid_matches);
         return false;
     }
     else {

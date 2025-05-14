@@ -6,7 +6,7 @@
 #include "stella_vslam/data/landmark.h"
 #include "stella_vslam/match/projection.h"
 #include "stella_vslam/util/angle.h"
-
+#include <spdlog/spdlog.h>
 namespace stella_vslam {
 namespace match {
 
@@ -120,8 +120,12 @@ unsigned int projection::match_current_and_last_frames(data::frame& curr_frm, co
         const auto& lm = last_frm.get_landmark(idx_last);
         if (!lm) {
             continue;
+            spdlog::warn("NOT LANDMARK, idx {}, frame id {}", idx_last, last_frm.id_);
         }
+        // spdlog::info("EXIST LANDMARK, idx {}, frame id {}", idx_last, last_frm.id_);
+
         if (lm->will_be_erased()) {
+            spdlog::warn("will_be_erased, idx {}, frame id {}", idx_last, last_frm.id_);
             continue;
         }
 
@@ -135,6 +139,7 @@ unsigned int projection::match_current_and_last_frames(data::frame& curr_frm, co
 
         // Ignore if it is reprojected outside the image
         if (!in_image) {
+            spdlog::warn("NOT IN IMAGE, idx {}, frame id {}", idx_last, last_frm.id_);
             continue;
         }
 
@@ -157,7 +162,9 @@ unsigned int projection::match_current_and_last_frames(data::frame& curr_frm, co
         auto indices = curr_frm.get_keypoints_in_cell(reproj(0), reproj(1),
                                                       margin * curr_frm.orb_params_->scale_factors_.at(last_scale_level),
                                                       min_level, max_level);
+        
         if (indices.empty()) {
+            spdlog::warn("INDICES EMPTY, idx {}, frame id {}", idx_last, last_frm.id_);
             continue;
         }
 
@@ -169,17 +176,20 @@ unsigned int projection::match_current_and_last_frames(data::frame& curr_frm, co
         for (const auto curr_idx : indices) {
             const auto& curr_lm = curr_frm.get_landmark(curr_idx);
             if (curr_lm && curr_lm->has_observation()) {
+                // spdlog::warn("NO OBSERVATION, idx: {}", curr_idx);
                 continue;
             }
 
             if (!curr_frm.frm_obs_.stereo_x_right_.empty() && curr_frm.frm_obs_.stereo_x_right_.at(curr_idx) > 0) {
                 const float reproj_error = std::fabs(x_right - curr_frm.frm_obs_.stereo_x_right_.at(curr_idx));
                 if (margin * curr_frm.orb_params_->scale_factors_.at(last_scale_level) < reproj_error) {
+                    // spdlog::warn("reproj_error: {}", reproj_error);
                     continue;
                 }
             }
 
             if (check_orientation_ && std::abs(util::angle::diff(last_frm.frm_obs_.undist_keypts_.at(idx_last).angle, curr_frm.frm_obs_.undist_keypts_.at(curr_idx).angle)) > 30.0) {
+                 spdlog::warn("check_orientation_");
                 continue;
             }
 

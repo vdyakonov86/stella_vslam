@@ -264,16 +264,21 @@ bool tracking_module::track_local_map(unsigned int& num_tracked_lms,
                                       const unsigned int min_num_obs_thr,
                                       const unsigned int fixed_keyframe_id_threshold) {
     bool succeeded = false;
+    spdlog::warn("track_local_map");
+
     SPDLOG_TRACE("tracking_module: update_local_map (curr_frm_={})", curr_frm_.id_);
     succeeded = update_local_map(fixed_keyframe_id_threshold, num_temporal_keyfrms);
+    spdlog::warn("update_local_map, {}", succeeded);
 
     if (succeeded) {
         succeeded = search_local_landmarks(fixed_keyframe_id_threshold);
+        spdlog::warn("search_local_landmarks, {}", succeeded);
     }
 
     if (succeeded) {
         SPDLOG_TRACE("tracking_module: optimize_current_frame_with_local_map (curr_frm_={})", curr_frm_.id_);
         succeeded = optimize_current_frame_with_local_map(num_tracked_lms, num_reliable_lms, min_num_obs_thr);
+        spdlog::warn("optimize_current_frame_with_local_map, {}", succeeded);
     }
 
     if (!succeeded) {
@@ -341,8 +346,12 @@ bool tracking_module::initialize() {
 bool tracking_module::track_current_frame() {
     bool succeeded = false;
 
+    if (true) {
+        succeeded = frame_tracker_.superglue_based_track(curr_frm_, last_frm_);
+    }
+
     // Tracking mode
-    if (twist_is_valid_) {
+    if (twist_is_valid_ && !succeeded) {
         // if the motion model is valid
         succeeded = frame_tracker_.motion_based_track(curr_frm_, last_frm_, twist_);
     }
@@ -365,9 +374,7 @@ bool tracking_module::track_current_frame() {
     auto descriptors_num = curr_frm_.frm_obs_.descriptors_.rows;
     if (!succeeded) {
         spdlog::warn("track_current_frame, frame_id: {}; succeeded: {}", curr_frm_.id_, succeeded);
-        spdlog::warn("undist_keypts_size: {}; descriptors_num: {}", undist_keypts_size, descriptors_num);
     }
-    spdlog::info("succeeded: {}; undist_keypts_size: {}; descriptors_num: {}", succeeded, undist_keypts_size, descriptors_num);
     return succeeded;
 }
 
