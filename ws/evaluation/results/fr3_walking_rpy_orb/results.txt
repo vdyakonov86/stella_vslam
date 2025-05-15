@@ -6,3 +6,19 @@ absolute_translational_error.std 0.124835 m
 absolute_translational_error.min 0.070522 m
 absolute_translational_error.max 0.691422 m
 max error pair idx: 294
+compared_pose_pairs 910 pairs
+absolute_translational_error.rmse 0.426221 m
+absolute_translational_error.mean 0.330753 m
+absolute_translational_error.median 0.269907 m
+absolute_translational_error.std 0.268826 m
+absolute_translational_error.min 0.019805 m
+absolute_translational_error.max 1.154960 m
+max error pair idx: 849
+compared_pose_pairs 910 pairs
+absolute_translational_error.rmse 0.346605 m
+absolute_translational_error.mean 0.299503 m
+absolute_translational_error.median 0.265725 m
+absolute_translational_error.std 0.174450 m
+absolute_translational_error.min 0.036213 m
+absolute_translational_error.max 0.857908 m
+max error pair idx: 908
